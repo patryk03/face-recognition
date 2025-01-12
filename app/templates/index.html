@@ -1,13 +1,77 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Real-Time Face Recognition</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face recognition</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+            background-color: #f4f4f4;
+            text-align: center;
+        }
+
+        body div {
+            display: grid;
+            column-gap: 20px;
+            justify-content: space-between;
+            grid-template-columns: auto auto;
+        }
+
+        h1 {
+            padding-bottom: 50px;
+            text-align: center;
+            border-bottom: 2px solid #4CAF50;
+            color: #656565;
+            margin-bottom: 40px;
+            grid-column: 1 / -1;
+        }
+
+        form {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 250px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:active {
+            background-color: #388e3c;
+        }
+    </style>
 </head>
 <body>
-    <h1>Face Recognition System</h1>
-    <a href="{{ url_for('video_feed') }}"><button>Start Face Recognition</button></a>
-    <a href="{{ url_for('add_person') }}"><button>Add New Person</button></a>
-    <br><br>
-    <img src="{{ url_for('video_feed') }}" width="80%">
+    <div>
+        <h1>Face recognition system</h1>
+        <form action="{{ url_for('live_recognition') }}">
+            <button type="submit">Start face recognition</button>
+        </form>
+        <form action="{{ url_for('add_person') }}">
+            <button type="submit">Add new person</button>
+        </form>
+    </div>
 </body>
 </html>
