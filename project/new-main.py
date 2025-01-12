@@ -42,11 +42,17 @@ def add_new_person(name, embeddings, classifier, label_mapping):
     X_dataset.extend(embeddings)
     y_dataset.extend([new_label] * len(embeddings))
 
+    print(f"Updated labels in dataset: {y_dataset}")
+
+
     # Refit the classifier with all data
     X_train = np.array(X_dataset)
     y_train = np.array(y_dataset)
 
     try:
+        classifier.named_steps['kneighborsclassifier'] = KNeighborsClassifier(n_neighbors=5)
+        X_train = np.array(X_dataset)
+        y_train = np.array(y_dataset)
         classifier.named_steps['kneighborsclassifier'].fit(X_train, y_train)
         print(f"Successfully retrained the classifier with {len(np.unique(y_train))} classes.")
     except ValueError as e:

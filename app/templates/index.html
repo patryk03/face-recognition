@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Face Recognition</title>
+    <title>Real-Time Face Recognition</title>
 </head>
 <body>
-    <img src="{{ url_for('video_feed') }}" width="100%" height="auto"  alt="Live video"/>
+    <h1>Face Recognition System</h1>
+    <a href="{{ url_for('video_feed') }}"><button>Start Face Recognition</button></a>
+    <a href="{{ url_for('add_person') }}"><button>Add New Person</button></a>
+    <br><br>
+    <img src="{{ url_for('video_feed') }}" width="80%">
 </body>
 </html>
