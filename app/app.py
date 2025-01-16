@@ -123,7 +123,7 @@ def gen_frames(classifier, label_mapping):
     if not live_recognition:
         return
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not cap.isOpened():
         print("Error: Cannot access the camera.")
         return
@@ -207,8 +207,8 @@ def gen_add_person_frames(name):
     if not adding_new_person:
         return
 
-    cap = cv2.VideoCapture(0)
-    while frame_count < 50 and adding_new_person:
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    while frame_count < 30 and adding_new_person:
         ret, frame = cap.read()
         if not ret:
             break
@@ -217,7 +217,7 @@ def gen_add_person_frames(name):
         if embedding is not None:
             embeddings.append(embedding)
             frame_count += 1
-            cv2.putText(frame, f"Adding {name} ({frame_count}/50)", (10, 30),
+            cv2.putText(frame, f"Adding {name} ({frame_count}/30)", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         else:
             cv2.putText(frame, "No face detected. Adjust position.", (10, 30),
