@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
+from river.neighbors import KNNClassifier
 import shutil
 import random
 from sklearn.preprocessing import normalize
@@ -19,11 +20,8 @@ from sklearn.preprocessing import normalize
 MODEL_PATH = "model/classifier.joblib"
 MAPPING_PATH = "model/label_mapping.pkl"
 
-X_dataset = []
-y_dataset = []
-
 def add_new_person(name, embeddings, classifier, label_mapping):
-    """Add a new person to the KNN classifier."""
+    """Add a new person to the online KNN classifier."""
     if not embeddings:
         print("No valid embeddings collected. Skipping addition of the new person.")
         return classifier, label_mapping
@@ -35,68 +33,57 @@ def add_new_person(name, embeddings, classifier, label_mapping):
     else:
         new_label = [key for key, value in label_mapping.items() if value == name][0]
 
-    print(f"Adding {name} with {len(embeddings)} embeddings to the dataset.")
+    print(type(classifier))   
 
-    # Update the global dataset
-    global X_dataset, y_dataset
-    X_dataset.extend(embeddings)
-    y_dataset.extend([new_label] * len(embeddings))
+    print(f"Adding {name} with {len(embeddings)} embeddings to the classifier.")
 
-    print(f"Updated labels in dataset: {y_dataset}")
+    # Incrementally train the classifier
+    for embedding in embeddings:
+        print(type(classifier))  # Debug: Check the classifier type
+        embedding_dict = dict(enumerate(embedding))  # Convert embedding to River-compatible format
+        classifier.learn_one(embedding_dict, new_label)  # Update the classifier in-place
 
 
-    # Refit the classifier with all data
-    X_train = np.array(X_dataset)
-    y_train = np.array(y_dataset)
-
-    try:
-        classifier.named_steps['kneighborsclassifier'] = KNeighborsClassifier(n_neighbors=5)
-        X_train = np.array(X_dataset)
-        y_train = np.array(y_dataset)
-        classifier.named_steps['kneighborsclassifier'].fit(X_train, y_train)
-        print(f"Successfully retrained the classifier with {len(np.unique(y_train))} classes.")
-    except ValueError as e:
-        print(f"Error during classifier fitting: {e}")
-        raise
+    print(f"Successfully added {name} to the classifier.")
 
     return classifier, label_mapping
+
 
 
 
 
 def load_model_and_mapping(model_path, mapping_path):
-    """Load the KNN classifier and label mapping."""
-    global X_dataset, y_dataset
+    """Load the online KNN classifier and label mapping."""
     try:
-        classifier = joblib.load(model_path)
+        # Load classifier
+        with open(model_path, "rb") as f:
+            classifier = pickle.load(f)
+
+        # Load label mapping
         with open(mapping_path, "rb") as f:
             label_mapping = pickle.load(f)
-        # Load the dataset
-        X_dataset = np.load("model/X_dataset.npy", allow_pickle=True).tolist()
-        y_dataset = np.load("model/y_dataset.npy", allow_pickle=True).tolist()
-        print("Model, dataset, and label mapping loaded successfully.")
+
+        print("Model and label mapping loaded successfully.")
     except FileNotFoundError:
         print("Model or label mapping not found. Initializing new model.")
-        classifier = make_pipeline(
-            StandardScaler(),
-            KNeighborsClassifier(n_neighbors=5)
-        )
+        # Initialize the online KNN classifier
+        classifier = KNNClassifier(n_neighbors=5)
         label_mapping = {}
-        X_dataset = []
-        y_dataset = []
+
     return classifier, label_mapping
 
 
 def save_model_and_mapping(classifier, label_mapping, model_path, mapping_path):
-    """Save the KNN classifier, dataset, and label mapping."""
-    global X_dataset, y_dataset
-    joblib.dump(classifier, model_path)
+    """Save the online KNN classifier and label mapping."""
+    # Save the classifier
+    with open(model_path, "wb") as f:
+        pickle.dump(classifier, f)
+    
+    # Save the label mapping
     with open(mapping_path, "wb") as f:
         pickle.dump(label_mapping, f)
-    # Save the dataset
-    np.save("model/X_dataset.npy", np.array(X_dataset, dtype=object))
-    np.save("model/y_dataset.npy", np.array(y_dataset, dtype=object))
-    print("Model, dataset, and label mapping saved.")
+
+    print("Model and label mapping saved.")
 
 
 def capture_and_save_frames_with_gaps(output_dir, num_frames=20, gap_seconds=1):
@@ -195,6 +182,7 @@ def split_train_test(input_dir, train_dir, test_dir, test_size=0.2):
 def add_face_mode(cap, classifier, label_mapping, num_frames=50):
     """Mode to add a new person by capturing frames and saving embeddings."""
     print("Add New Face Mode. Enter a label for the new face:")
+    print(type(classifier))
     new_name = input("Label: ")
 
     print(f"Capturing {num_frames} frames for {new_name}...")
@@ -232,6 +220,7 @@ def add_face_mode(cap, classifier, label_mapping, num_frames=50):
 
     # Train the model with collected embeddings
     if embeddings:
+        print(type(classifier))
         classifier, label_mapping = add_new_person(new_name, embeddings, classifier, label_mapping)
         save_model_and_mapping(classifier, label_mapping, MODEL_PATH, MAPPING_PATH)
         print(f"Successfully added {new_name}.")
@@ -274,10 +263,20 @@ def recognition_mode(cap, classifier, label_mapping):
 
             # Predict with the classifier
             try:
-                probabilities = classifier.named_steps['kneighborsclassifier'].predict_proba([embedding])[0]
-                predicted_class = np.argmax(probabilities)
+                # Convert embedding to River-compatible format (dictionary)
+                embedding_dict = dict(enumerate(embedding))
+
+                # Get the predicted class
+                predicted_class = classifier.predict_one(embedding_dict)
+
+                # Get confidence/probabilities for each class (if supported by River version)
+                probabilities = classifier.predict_proba_one(embedding_dict)
+                
+                # Retrieve the predicted confidence
+                confidence = probabilities.get(predicted_class, 0.0)
+
+                # Retrieve the name for the predicted class
                 name = label_mapping.get(predicted_class, "Unknown")
-                confidence = probabilities[predicted_class]
 
                 # Draw red box around the face
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
@@ -286,8 +285,9 @@ def recognition_mode(cap, classifier, label_mapping):
                 cv2.putText(frame, f"{name} ({confidence:.2f})",
                             (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
                 print(f"Recognized: {name}, Confidence: {confidence:.2f}")
-            except ValueError as e:
+            except Exception as e:
                 print(f"Error during recognition: {e}")
+
 
         # Display the frame
         cv2.imshow("Face Recognition", frame)
@@ -307,6 +307,8 @@ if __name__ == "__main__":
     # Load model and mappings
     classifier, label_mapping = load_model_and_mapping(MODEL_PATH, MAPPING_PATH)
 
+    print(type(classifier))
+
     # Main menu
     print("Choose mode:")
     print("1. Add New Face")
@@ -314,7 +316,7 @@ if __name__ == "__main__":
     choice = input("Enter 1 or 2: ")
 
     if choice == "1":
-        classifier, label_mapping = add_face_mode(cap, classifier, label_mapping, num_frames=50)
+        classifier, label_mapping = add_face_mode(cap, classifier, label_mapping, num_frames=20)
     elif choice == "2":
         recognition_mode(cap, classifier, label_mapping)
     else:
